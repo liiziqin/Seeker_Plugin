@@ -2,8 +2,9 @@
 chcp 65001 >nul
 setlocal
 
-:: 設定專案根目錄路徑
-set "PROJECT_ROOT=C:\Users\AnkaLu\Desktop\Home\GitHub_WorkSpace\Seeker_Plugin"
+:: 設定專案根目錄路徑 (使用當前腳本所在的目錄)
+set "PROJECT_ROOT=%~dp0"
+if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
 
 :: 設定 Android SDK 環境變數
 set "ANDROID_HOME=%PROJECT_ROOT%"
