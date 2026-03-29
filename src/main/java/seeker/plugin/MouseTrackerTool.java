@@ -28,7 +28,7 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
     // 特定座標任務
     private final int TARGET_X = 260;
     private final int TARGET_Y = 530;
-    private final int CLICK_COUNT = 15;
+    private final int CLICK_COUNT = 20;
 
     public MouseTrackerTool() {
         initUI();
