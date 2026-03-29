@@ -14,6 +14,7 @@ echo ==========================================
 echo   Appium Server 快速啟動腳本
 echo ==========================================
 echo ANDROID_HOME 指向: %ANDROID_HOME%
+echo PATH 指向: %PATH%
 echo.
 echo 正在檢查 ADB 狀態...
 adb devices
@@ -23,6 +24,7 @@ echo (按下 Ctrl+C 可停止伺服器)
 echo ------------------------------------------
 
 :: 啟動 Appium
-appium
+:: 使用 --allow-insecure=*:adb_shell 以允許 Java 程式執行 shell 命令 (如 ps, getprop)
+appium --allow-insecure=*:adb_shell
 
 pause
