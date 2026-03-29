@@ -177,7 +177,8 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
         int code = e.getKeyCode();
 
         // 任務 ` : 原有的核准功能 (15次點擊)
-        if (code == NativeKeyEvent.VC_BACKQUOTE) {
+//        if (code == NativeKeyEvent.VC_BACKQUOTE) {
+        if (code == NativeKeyEvent.VC_0) {
             runTask("執行核准", () -> performClicks(TARGET_X, TARGET_Y, CLICK_COUNT, 10));
         }
         // 任務 1 : (265, 305) 點擊 1 次
