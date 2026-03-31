@@ -10,6 +10,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
 import java.util.Random;
+import java.awt.event.KeyEvent;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,8 +23,10 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
     private Robot robot;
     private int hotkeyCodeBase = NativeKeyEvent.VC_BACKQUOTE;
     private boolean isHotkeyActive = true;
+    private boolean isLooping = false; // 迴圈狀態
     private JButton toggleButton;
     private Random random = new Random();
+    private Thread loopThread;
 
     // 特定座標任務
     private final int TARGET_X = 260;
@@ -39,7 +42,7 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
 
     private void initUI() {
         setTitle("Seeker - 鼠標追蹤工具");
-        setSize(320, 350);
+        setSize(320, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setAlwaysOnTop(true); // 始終置頂，方便觀察
         setResizable(false);
@@ -88,10 +91,11 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
 
         // 熱鍵提示標籤 (改為多行顯示所有任務)
         hotkeyLabel = new JLabel("<html><div style='text-align: center; color: #6e7681;'>" +
-                "[ ` ] 執行核准 (15次點擊)<br/>" +
+                "[ ` ] 執行核准 (20次點擊)<br/>" +
                 "[ 1 ] (265, 305) 點擊 1 次<br/>" +
                 "[ 2 ] (300, 285) 或 (320, 285) 隨機點擊<br/>" +
-                "[ 3 ] (275, 430) 點擊 1 次" +
+                "[ 3 ] (275, 430) 點擊 1 次<br/>" +
+                "<span style='color: #8888ff;'>[ F1 ] 切換全自動迴圈模式</span>" +
                 "</div></html>", SwingConstants.CENTER);
         hotkeyLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         gbc.gridy = 2;
@@ -176,29 +180,109 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
 
         int code = e.getKeyCode();
 
-        // 任務 ` : 原有的核准功能 (15次點擊)
-//        if (code == NativeKeyEvent.VC_BACKQUOTE) {
-        if (code == NativeKeyEvent.VC_0) {
-            runTask("執行核准", () -> performClicks(TARGET_X, TARGET_Y, CLICK_COUNT, 10));
+        // F1 : 切換迴圈模式
+        if (code == NativeKeyEvent.VC_F1) {
+            toggleLoop();
         }
-        // 任務 1 : (265, 305) 點擊 1 次
+        // 任務 0 (原有的核准功能)
+        else if (code == NativeKeyEvent.VC_0 || code == NativeKeyEvent.VC_BACKQUOTE) {
+            runTask("執行核准", this::taskApprove);
+        }
+        // 任務 1
         else if (code == NativeKeyEvent.VC_1) {
-            runTask("任務 1", () -> performClicks(265, 305, 1, 0));
+            runTask("任務 1", this::task1);
         }
-        // 任務 2 : (300, 285) 或 (320, 285) 隨機取一個座標點擊
+        // 任務 2
         else if (code == NativeKeyEvent.VC_2) {
-            boolean pickFirst = random.nextBoolean();
-            int x = pickFirst ? 300 : 320;
-            int y = 285;
-            runTask("任務 2 (隨機)", () -> performClicks(x, y, 1, 0));
+            runTask("任務 2", this::task2);
         }
-        // 任務 3 : (275, 430) 點擊一次
+        // 任務 3
         else if (code == NativeKeyEvent.VC_3) {
-            runTask("任務 3", () -> performClicks(275, 430, 1, 0));
+            runTask("任務 3", this::task3);
         }
     }
 
+    // 任務邏輯封裝 (還原為座標點擊)
+    private void taskApprove() { performClicks(TARGET_X, TARGET_Y, CLICK_COUNT, 10); }
+    private void task1() { performClicks(265, 305, 1, 0); }
+    private void task2() {
+        boolean pickFirst = random.nextBoolean();
+        int x = pickFirst ? 300 : 320;
+        int y = 285;
+        performClicks(x, y, 1, 0);
+    }
+    private void task3() { performClicks(275, 430, 1, 0); }
+
+    private void toggleLoop() {
+        isLooping = !isLooping;
+        if (isLooping) {
+            startAutomationLoop();
+        } else {
+            if (loopThread != null) loopThread.interrupt();
+        }
+        
+        SwingUtilities.invokeLater(() -> {
+            String status = isLooping ? "<span style='color: #46a043;'>● 迴圈執行中</span>" : "● 自動化功能：生效中";
+            toggleButton.setText(isLooping ? "停止全自動迴圈 (F1)" : "自動化功能：生效中");
+            // 這裡簡單借用 hotkeyLabel 反饋
+            if (isLooping) {
+                hotkeyLabel.setText("<html><div style='text-align: center; color: #46a043;'>[ 正在執行全自動迴圈 ]<br/>使用 F1 鍵可以停止</div></html>");
+            } else {
+                updateHotkeyHint();
+            }
+        });
+    }
+
+    private void startAutomationLoop() {
+        loopThread = new Thread(() -> {
+            try {
+                while (isLooping) {
+                    // 第一步: 隨機是否按下1
+                    if (random.nextBoolean()) task1();
+                    // 第二步: 延遲2秒
+                    Thread.sleep(1000);
+                    if (!isLooping) break;
+
+                    // 第三步: 直接按下2
+                    task2();
+                    // 第四步: 延遲2秒
+                    Thread.sleep(2000);
+                    if (!isLooping) break;
+
+                    // 第五步: 直接按下3
+                    task3();
+                    // 第六步: 延遲1秒
+                    Thread.sleep(2000);
+                    if (!isLooping) break;
+
+                    // 第七步: 直接按下0 (核准)
+                    taskApprove();
+                    // 第八步: 延遲3秒
+                    Thread.sleep(3000);
+                }
+            } catch (InterruptedException e) {
+                // 執行緒中斷，正常退出
+            } finally {
+                isLooping = false;
+                SwingUtilities.invokeLater(this::updateHotkeyHint);
+            }
+        });
+        loopThread.start();
+    }
+
+    private void updateHotkeyHint() {
+        hotkeyLabel.setText("<html><div style='text-align: center; color: #6e7681;'>" +
+                "[ ` ] 執行核准 (20次點擊)<br/>" +
+                "[ 1 ] (265, 305) 點擊 1 次<br/>" +
+                "[ 2 ] (300, 285) 或 (320, 285) 隨機點擊<br/>" +
+                "[ 3 ] (275, 430) 點擊 1 次<br/>" +
+                "<span style='color: #8888ff;'>[ F1 ] 切換全自動迴圈模式</span>" +
+                "</div></html>");
+    }
+
     private void runTask(String taskName, Runnable taskLogic) {
+        if (isLooping) return; // 迴圈進行中禁用手動觸發
+
         new Thread(() -> {
             SwingUtilities.invokeLater(() -> {
                 hotkeyLabel.setText("<html><div style='text-align: center; color: #ffab00;'>正在執行: " + taskName + "</div></html>");
@@ -208,12 +292,7 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
 
             SwingUtilities.invokeLater(() -> {
                 Timer resetTimer = new Timer(800, x -> {
-                    hotkeyLabel.setText("<html><div style='text-align: center; color: #6e7681;'>" +
-                            "[ ` ] 執行核准 (15次點擊)<br/>" +
-                            "[ 1 ] (265, 305) 點擊 1 次<br/>" +
-                            "[ 2 ] (300, 285) 或 (320, 285) 隨機點擊<br/>" +
-                            "[ 3 ] (275, 430) 點擊 1 次" +
-                            "</div></html>");
+                    updateHotkeyHint();
                 });
                 resetTimer.setRepeats(false);
                 resetTimer.start();
