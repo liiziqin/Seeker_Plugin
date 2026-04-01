@@ -78,3 +78,5 @@ adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 900 1060
 adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 1850
 --核准
 adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 2440
+
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp exec-out screencap -p > ../captures/screen.png
