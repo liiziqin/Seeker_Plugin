@@ -63,6 +63,7 @@ adb start-server
 ### 截圖
 adb -s 192.168.43.187:43591 exec-out screencap -p > ../captures/screen.png
 adb pair 192.168.43.187:39487
+adb connect 192.168.0.150:41005
 adb disconnect
 adb kill-server
 adb start-server

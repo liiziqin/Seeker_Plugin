@@ -31,8 +31,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JButton refreshButton;
     private JButton automationButton;
 
-    private boolean isLooping = false;
-    private Thread loopThread;
+    private volatile boolean isLooping = false;
+    private List<Thread> deviceThreads = new ArrayList<>();
     private final Random random = new Random();
     private String adbPath = "adb";
 
@@ -76,7 +76,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         // 頂部導航
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setOpaque(false);
-        
+
         JLabel titleLabel = new JLabel("裝置控制中心");
         titleLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 20));
         titleLabel.setForeground(new Color(88, 166, 255));
@@ -177,64 +177,85 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             automationButton.setBackground(new Color(46, 160, 67));
             statusLabel.setText("● 已停止");
             statusLabel.setForeground(new Color(207, 34, 46));
-            if (loopThread != null) loopThread.interrupt();
+            if (deviceThreads != null) {
+                for (Thread t : deviceThreads) t.interrupt();
+                deviceThreads.clear();
+            }
         }
     }
 
     private void startAutomationLoop() {
-        loopThread = new Thread(() -> {
-            try {
-                while (isLooping) {
-                    List<String> devices = getAdbDevices();
-                    if (devices.isEmpty()) {
-                        SwingUtilities.invokeLater(() -> statusLabel.setText("● 錯誤：未偵測到裝置"));
-                        Thread.sleep(3000);
-                        continue;
-                    }
-
-                    for (String deviceId : devices) {
-                        if (!isLooping) break;
-                        
-                        SwingUtilities.invokeLater(() -> statusLabel.setText("● 執行中: " + deviceId));
-
-                        // 1. 隨機幣種 (600, 1160)
-                        if (random.nextInt(100) < 50) { // 50% 機率
-                            tap(deviceId, 600, 1160);
-                        }
-                        Thread.sleep(1000);
-
-                        // 3. 隨機 25% (900, 1060) 或 50% (770, 1060)
-                        if (random.nextBoolean()) {
-                            tap(deviceId, 900, 1060);
-                        } else {
-                            tap(deviceId, 770, 1060);
-                        }
-                        Thread.sleep(2000);
-
-                        // 5. Swap (600, 1850)
-                        tap(deviceId, 600, 1850);
-                        Thread.sleep(2000);
-
-                        // 7. Approve (600, 2440) - 連續點擊 12 次
-                        for (int i = 0; i < 12; i++) {
-                            tap(deviceId, 600, 2440);
-                            Thread.sleep(10); // 微小間隔確保手機捕捉到
-                        }
-                        Thread.sleep(3000);
-                    }
-                }
-            } catch (InterruptedException e) {
-                // Thread stopped
+        new Thread(() -> {
+            List<String> devices = getAdbDevices();
+            if (devices.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    statusLabel.setText("● 錯誤：未偵測到裝置");
+                    toggleAutomation(); // 重置按鈕狀態
+                });
+                return;
             }
-        });
-        loopThread.start();
+
+            deviceThreads.clear();
+            for (String deviceId : devices) {
+                Thread t = new Thread(() -> {
+                    try {
+                        System.out.println("Started thread for device: " + deviceId);
+                        while (isLooping) {
+                            runDeviceSequence(deviceId);
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("Thread interrupted for device: " + deviceId);
+                    } finally {
+                        System.out.println("Thread finished for device: " + deviceId);
+                    }
+                }, "Thread-" + deviceId);
+                deviceThreads.add(t);
+                t.start();
+            }
+
+            SwingUtilities.invokeLater(() -> statusLabel.setText("● " + devices.size() + " 台裝置運行中..."));
+        }).start();
+    }
+
+    private void runDeviceSequence(String deviceId) throws InterruptedException {
+        // 1. 隨機幣種 (600, 1160)
+        if (random.nextInt(100) < 50) { // 50% 機率
+            tap(deviceId, 600, 1160);
+        }
+        Thread.sleep(1000);
+        if (!isLooping) return;
+
+        // 3. 隨機 25% (900, 1060) 或 50% (770, 1060)
+        if (random.nextBoolean()) {
+            tap(deviceId, 900, 1060);
+        } else {
+            tap(deviceId, 770, 1060);
+        }
+        Thread.sleep(2000);
+        if (!isLooping) return;
+
+        // 5. Swap (600, 1850)
+        tap(deviceId, 600, 1850);
+        Thread.sleep(2000);
+        if (!isLooping) return;
+
+        // 7. Approve (600, 2440) - 連續點擊 20 次
+        for (int i = 0; i < 2; ++i) {
+            for (int j = 0; j < 20; j++) {
+                if (!isLooping) return;
+                tap(deviceId, 600, 2440);
+                Thread.sleep(10); // 微小間隔
+            }
+            Thread.sleep(1500);
+        }
+
     }
 
     private void tap(String deviceId, int x, int y) {
         // 隨機偏置 +-3
         int rx = x + random.nextInt(7) - 3;
         int ry = y + random.nextInt(7) - 3;
-        
+
         String command = String.format("\"%s\" -s %s shell input tap %d %d", adbPath, deviceId, rx, ry);
         try {
             Runtime.getRuntime().exec(command);
@@ -288,8 +309,13 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         }
     }
 
-    @Override public void nativeKeyReleased(NativeKeyEvent e) {}
-    @Override public void nativeKeyTyped(NativeKeyEvent e) {}
+    @Override
+    public void nativeKeyReleased(NativeKeyEvent e) {
+    }
+
+    @Override
+    public void nativeKeyTyped(NativeKeyEvent e) {
+    }
 
     public static void main(String[] args) {
         FlatDarkLaf.setup();
