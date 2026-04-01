@@ -59,3 +59,22 @@ adb kill-server
 adb start-server
 ```
 然後再次執行 `adb connect`。
+
+### 截圖
+adb -s 192.168.43.187:43591 exec-out screencap -p > ../captures/screen.png
+adb pair 192.168.43.187:39487
+adb disconnect
+adb kill-server
+adb start-server
+adb devices
+
+--切換幣種
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 1160
+--50%
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 770 1060
+--25%
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 900 1060
+--Swap
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 1850
+--核准
+adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 2440

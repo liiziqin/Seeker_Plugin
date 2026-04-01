@@ -252,7 +252,7 @@ public class MouseTrackerTool extends JFrame implements NativeKeyListener {
                     // 第五步: 直接按下3
                     task3();
                     // 第六步: 延遲1秒
-                    Thread.sleep(2000);
+                    Thread.sleep(3000);
                     if (!isLooping) break;
 
                     // 第七步: 直接按下0 (核准)
