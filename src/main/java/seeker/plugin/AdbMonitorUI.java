@@ -5,6 +5,8 @@ import com.github.kwhat.jnativehook.GlobalScreen;
 import com.github.kwhat.jnativehook.NativeHookException;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
+import com.sun.jna.Native;
+import com.sun.jna.win32.StdCallLibrary;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -26,10 +28,27 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private DefaultListModel<String> deviceListModel;
     private JList<String> deviceList;
     private JCheckBox realTimeUpdateCheckBox;
+    private JCheckBox keepAwakeCheckBox;
     private Timer updateTimer;
     private JLabel statusLabel;
     private JButton refreshButton;
     private JButton automationButton;
+
+    /**
+     * Windows 原生 API 介面定義
+     */
+    public interface Kernel32 extends StdCallLibrary {
+        Kernel32 INSTANCE = Native.load("kernel32", Kernel32.class);
+
+        // ES_CONTINUOUS: 通知系統目前狀態應持續直到下次呼叫
+        long ES_CONTINUOUS = 0x80000000L;
+        // ES_SYSTEM_REQUIRED: 防止系統進入睡眠模式
+        long ES_SYSTEM_REQUIRED = 0x00000001L;
+        // ES_DISPLAY_REQUIRED: 防止螢幕關閉
+        long ES_DISPLAY_REQUIRED = 0x00000002L;
+
+        long SetThreadExecutionState(long esFlags);
+    }
 
     private volatile boolean isLooping = false;
     private List<Thread> deviceThreads = new ArrayList<>();
@@ -82,13 +101,26 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         titleLabel.setForeground(new Color(88, 166, 255));
         headerPanel.add(titleLabel, BorderLayout.WEST);
 
+        JPanel configPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        configPanel.setOpaque(false);
+
+        keepAwakeCheckBox = new JCheckBox("螢幕常亮");
+        keepAwakeCheckBox.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        keepAwakeCheckBox.setForeground(new Color(201, 209, 217));
+        keepAwakeCheckBox.setOpaque(false);
+        keepAwakeCheckBox.setFocusable(false);
+        keepAwakeCheckBox.addActionListener(e -> toggleStayAwake());
+
         realTimeUpdateCheckBox = new JCheckBox("列表實時更新");
         realTimeUpdateCheckBox.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         realTimeUpdateCheckBox.setForeground(new Color(201, 209, 217));
         realTimeUpdateCheckBox.setOpaque(false);
         realTimeUpdateCheckBox.setFocusable(false);
         realTimeUpdateCheckBox.addActionListener(e -> toggleUpdateTimer());
-        headerPanel.add(realTimeUpdateCheckBox, BorderLayout.EAST);
+
+        configPanel.add(keepAwakeCheckBox);
+        configPanel.add(realTimeUpdateCheckBox);
+        headerPanel.add(configPanel, BorderLayout.EAST);
 
         mainPanel.add(headerPanel, BorderLayout.NORTH);
 
@@ -162,6 +194,23 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private void toggleUpdateTimer() {
         if (realTimeUpdateCheckBox.isSelected()) updateTimer.start();
         else updateTimer.stop();
+    }
+
+    /**
+     * 使用 Windows 原生 API 切換防止睡眠狀態
+     */
+    private void toggleStayAwake() {
+        if (keepAwakeCheckBox.isSelected()) {
+            // 請求系統保持開啟狀態：持續性 | 系統喚醒 | 螢幕開啟
+            Kernel32.INSTANCE.SetThreadExecutionState(
+                    Kernel32.ES_CONTINUOUS | Kernel32.ES_SYSTEM_REQUIRED | Kernel32.ES_DISPLAY_REQUIRED
+            );
+            System.out.println("Windows API: 已註冊保持喚醒狀態");
+        } else {
+            // 恢復系統正常電源設定
+            Kernel32.INSTANCE.SetThreadExecutionState(Kernel32.ES_CONTINUOUS);
+            System.out.println("Windows API: 已恢復正常電源設定");
+        }
     }
 
     private void toggleAutomation() {
