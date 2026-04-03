@@ -81,3 +81,10 @@ adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 1850
 adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp shell input tap 600 2440
 
 adb -s adb-SM02G4061956964-XYxwQZ._adb-tls-connect._tcp exec-out screencap -p > ../captures/screen.png
+adb connect 192.168.0.150:
+adb connect 192.168.0.213:
+adb connect 192.168.0.144:
+
+adb connect 192.168.0.150:41649
+adb connect 192.168.0.213:38625
+adb connect 192.168.0.144:32991
