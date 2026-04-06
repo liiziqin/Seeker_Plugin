@@ -72,7 +72,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
     private void initUI() {
         setTitle("Seeker - ADB 自動化監控工具");
-        setSize(450, 600);
+        setSize(450, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setAlwaysOnTop(true);
@@ -146,7 +146,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
         // 底部控制
-        JPanel footerPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        JPanel footerPanel = new JPanel(new GridLayout(3, 1, 10, 10));
         footerPanel.setOpaque(false);
 
         // 狀態與刷新
@@ -162,6 +162,27 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         refreshButton.addActionListener(e -> refreshDeviceList());
         statusRow.add(refreshButton, BorderLayout.EAST);
 
+        // 亮度控制快捷按鈕
+        JPanel brightnessPanel = new JPanel(new GridLayout(1, 2, 10, 10));
+        brightnessPanel.setOpaque(false);
+
+        JButton lowBrightnessBtn = new JButton("手動模式 (亮度1)");
+        lowBrightnessBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        lowBrightnessBtn.setFocusable(false);
+        lowBrightnessBtn.setBackground(new Color(60, 63, 65));
+        lowBrightnessBtn.setForeground(Color.WHITE);
+        lowBrightnessBtn.addActionListener(e -> setAllDevicesBrightness(0, 1));
+
+        JButton highBrightnessBtn = new JButton("自動模式 (亮度20)");
+        highBrightnessBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        highBrightnessBtn.setFocusable(false);
+        highBrightnessBtn.setBackground(new Color(33, 110, 214));
+        highBrightnessBtn.setForeground(Color.WHITE);
+        highBrightnessBtn.addActionListener(e -> setAllDevicesBrightness(1, 20));
+
+        brightnessPanel.add(lowBrightnessBtn);
+        brightnessPanel.add(highBrightnessBtn);
+
         // 自動化大按鈕
         automationButton = new JButton("開始自動化迴圈 (F1)");
         automationButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
@@ -171,6 +192,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         automationButton.addActionListener(e -> toggleAutomation());
 
         footerPanel.add(statusRow);
+        footerPanel.add(brightnessPanel);
         footerPanel.add(automationButton);
 
         mainPanel.add(footerPanel, BorderLayout.SOUTH);
@@ -216,12 +238,14 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private void toggleAutomation() {
         isLooping = !isLooping;
         if (isLooping) {
+            setAllDevicesBrightness(0, 1);
             automationButton.setText("停止自動化迴圈 (F1)");
             automationButton.setBackground(new Color(207, 34, 46));
             statusLabel.setText("● 運作中...");
             statusLabel.setForeground(new Color(46, 160, 67));
             startAutomationLoop();
         } else {
+            setAllDevicesBrightness(1, 20);
             automationButton.setText("開始自動化迴圈 (F1)");
             automationButton.setBackground(new Color(46, 160, 67));
             statusLabel.setText("● 已停止");
@@ -304,13 +328,26 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         // 隨機偏置 +-3
         int rx = x + random.nextInt(7) - 3;
         int ry = y + random.nextInt(7) - 3;
+        runAdb(deviceId, String.format("shell input tap %d %d", rx, ry));
+    }
 
-        String command = String.format("\"%s\" -s %s shell input tap %d %d", adbPath, deviceId, rx, ry);
+    private void setAllDevicesBrightness(int mode, int value) {
+        new Thread(() -> {
+            List<String> devices = getAdbDevices();
+            for (String deviceId : devices) {
+                runAdb(deviceId, "shell settings put system screen_brightness_mode " + mode);
+                runAdb(deviceId, "shell settings put system screen_brightness " + value);
+            }
+        }).start();
+    }
+
+    private void runAdb(String deviceId, String shellCommand) {
+        String command = String.format("\"%s\" -s %s %s", adbPath, deviceId, shellCommand);
         try {
             Runtime.getRuntime().exec(command);
             System.out.println("Execute: " + command);
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("ADB Execute Error: " + e.getMessage());
         }
     }
 
