@@ -291,6 +291,9 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     }
 
     private void runDeviceSequence(String deviceId) throws InterruptedException {
+        // 0. 關閉或刷新(1113, 606)
+        tap(deviceId, 1113, 606);
+
         // 1. 隨機幣種 (600, 1160)
         if (random.nextInt(100) < 50) { // 50% 機率
             tap(deviceId, 600, 1160);
