@@ -324,7 +324,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             }
             Thread.sleep(1500);
         }
-
+        Thread.sleep(1000);
     }
 
     private void tap(String deviceId, int x, int y) {
