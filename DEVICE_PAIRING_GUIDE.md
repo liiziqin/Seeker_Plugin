@@ -88,3 +88,28 @@ adb connect 192.168.0.144:
 adb connect 192.168.0.150:41649
 adb connect 192.168.0.213:38625
 adb connect 192.168.0.144:32991
+
+--列出所有 App
+adb -s 192.168.0.144:45633 shell pm list packages
+--僅列出第三方 App（排除系統內建）
+adb -s 192.168.0.144:45633 shell pm list packages -3
+
+--取得當前應用程式
+adb -s 192.168.0.144:45633 shell dumpsys window | findstr "mCurrentFocus"
+--如果無法取得當前應用程式，可以用搜尋的，可以取得pkg和cmp
+adb -s 192.168.0.144:45633 shell dumpsys activity activities | findstr "lince"
+adb -s 192.168.0.144:45633 shell dumpsys activity activities | findstr "degencoinflip"
+
+--開啟應用程式
+adb -s 192.168.0.144:45633 shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity
+--強制停止
+adb -s 192.168.0.144:45633 shell am force-stop app.backpack.mobile.standalone
+
+adb -s 192.168.0.144:45633 shell am start -n finance.lince.app/finance.lince.app.LauncherActivity
+adb -s 192.168.0.144:45633 shell am start -n com.degencoinflip.app.twa/com.degencoinflip.app.twa.LauncherActivity
+adb -s 192.168.0.144:45633 shell am start -n com.bringyour.network/com.bringyour.network.MainActivity
+adb -s 192.168.0.144:45633 shell am start -n io.getgrass.www/io.getgrass.www.MainActivity
+adb -s 192.168.0.144:45633 shell am start -n com.solanamobile.wallet/com.solflare.mobile.MainActivity
+
+--「清除資料」並關閉
+adb -s 192.168.0.144:45633 shell pm clear app.backpack.mobile.standalone

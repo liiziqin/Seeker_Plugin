@@ -33,6 +33,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JLabel statusLabel;
     private JButton refreshButton;
     private JButton automationButton;
+    private JButton autoRestartBackPackBtn;
 
     /**
      * Windows 原生 API 介面定義
@@ -52,6 +53,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
     private volatile boolean isLooping = false;
     private List<Thread> deviceThreads = new ArrayList<>();
+    private volatile boolean isBackPackLooping = false;
+    private List<Thread> backPackThreads = new ArrayList<>();
     private final Random random = new Random();
     private String adbPath = "adb";
 
@@ -84,7 +87,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                 super.paintComponent(g);
                 Graphics2D g2d = (Graphics2D) g;
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = new GradientPaint(0, 0, new Color(43, 45, 48), 0, getHeight(), new Color(25, 26, 28));
+                GradientPaint gp = new GradientPaint(0, 0, new Color(43, 45, 48), 0, getHeight(),
+                        new Color(25, 26, 28));
                 g2d.setPaint(gp);
                 g2d.fillRect(0, 0, getWidth(), getHeight());
             }
@@ -134,8 +138,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         deviceList.setFixedCellHeight(35);
         deviceList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
+                    boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,
+                        cellHasFocus);
                 label.setBorder(new EmptyBorder(0, 10, 0, 10));
                 return label;
             }
@@ -146,7 +152,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
         // 底部控制
-        JPanel footerPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+        JPanel footerPanel = new JPanel(new GridLayout(4, 1, 10, 10));
         footerPanel.setOpaque(false);
 
         // 狀態與刷新
@@ -183,6 +189,27 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         brightnessPanel.add(lowBrightnessBtn);
         brightnessPanel.add(highBrightnessBtn);
 
+        // BackPack 控制面板
+        JPanel backpackPanel = new JPanel(new GridLayout(1, 2, 10, 10));
+        backpackPanel.setOpaque(false);
+
+        autoRestartBackPackBtn = new JButton("自動重啟BackPack");
+        autoRestartBackPackBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        autoRestartBackPackBtn.setFocusable(false);
+        autoRestartBackPackBtn.setBackground(new Color(133, 60, 214));
+        autoRestartBackPackBtn.setForeground(Color.WHITE);
+        autoRestartBackPackBtn.addActionListener(e -> toggleAutoRestartBackPack());
+
+        JButton resetBackPackBtn = new JButton("重置BackPack");
+        resetBackPackBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        resetBackPackBtn.setFocusable(false);
+        resetBackPackBtn.setBackground(new Color(214, 110, 33));
+        resetBackPackBtn.setForeground(Color.WHITE);
+        resetBackPackBtn.addActionListener(e -> resetBackPackAllDevices());
+
+        backpackPanel.add(autoRestartBackPackBtn);
+        backpackPanel.add(resetBackPackBtn);
+
         // 自動化大按鈕
         automationButton = new JButton("開始自動化迴圈 (F1)");
         automationButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
@@ -193,6 +220,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
         footerPanel.add(statusRow);
         footerPanel.add(brightnessPanel);
+        footerPanel.add(backpackPanel);
         footerPanel.add(automationButton);
 
         mainPanel.add(footerPanel, BorderLayout.SOUTH);
@@ -214,8 +242,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     }
 
     private void toggleUpdateTimer() {
-        if (realTimeUpdateCheckBox.isSelected()) updateTimer.start();
-        else updateTimer.stop();
+        if (realTimeUpdateCheckBox.isSelected())
+            updateTimer.start();
+        else
+            updateTimer.stop();
     }
 
     /**
@@ -225,8 +255,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         if (keepAwakeCheckBox.isSelected()) {
             // 請求系統保持開啟狀態：持續性 | 系統喚醒 | 螢幕開啟
             Kernel32.INSTANCE.SetThreadExecutionState(
-                    Kernel32.ES_CONTINUOUS | Kernel32.ES_SYSTEM_REQUIRED | Kernel32.ES_DISPLAY_REQUIRED
-            );
+                    Kernel32.ES_CONTINUOUS | Kernel32.ES_SYSTEM_REQUIRED | Kernel32.ES_DISPLAY_REQUIRED);
             System.out.println("Windows API: 已註冊保持喚醒狀態");
         } else {
             // 恢復系統正常電源設定
@@ -251,7 +280,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             statusLabel.setText("● 已停止");
             statusLabel.setForeground(new Color(207, 34, 46));
             if (deviceThreads != null) {
-                for (Thread t : deviceThreads) t.interrupt();
+                for (Thread t : deviceThreads)
+                    t.interrupt();
                 deviceThreads.clear();
             }
         }
@@ -299,7 +329,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             tap(deviceId, 600, 1160);
         }
         Thread.sleep(1000);
-        if (!isLooping) return;
+        if (!isLooping)
+            return;
 
         // 3. 隨機 25% (900, 1060) 或 50% (770, 1060)
         if (random.nextBoolean()) {
@@ -308,17 +339,20 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             tap(deviceId, 770, 1060);
         }
         Thread.sleep(2000);
-        if (!isLooping) return;
+        if (!isLooping)
+            return;
 
         // 5. Swap (600, 1850)
         tap(deviceId, 600, 1850);
         Thread.sleep(2000);
-        if (!isLooping) return;
+        if (!isLooping)
+            return;
 
         // 7. Approve (600, 2440) - 連續點擊 20 次
         for (int i = 0; i < 2; ++i) {
             for (int j = 0; j < 20; j++) {
-                if (!isLooping) return;
+                if (!isLooping)
+                    return;
                 tap(deviceId, 600, 2440);
                 Thread.sleep(10); // 微小間隔
             }
@@ -332,6 +366,114 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         int rx = x + random.nextInt(7) - 3;
         int ry = y + random.nextInt(7) - 3;
         runAdb(deviceId, String.format("shell input tap %d %d", rx, ry));
+    }
+
+    private void toggleAutoRestartBackPack() {
+        isBackPackLooping = !isBackPackLooping;
+        if (isBackPackLooping) {
+            setAllDevicesBrightness(0, 1);
+            autoRestartBackPackBtn.setText("停止重啟BackPack");
+            autoRestartBackPackBtn.setBackground(new Color(207, 34, 46));
+            startAutoRestartBackPackLoop();
+        } else {
+            setAllDevicesBrightness(1, 20);
+            autoRestartBackPackBtn.setText("自動重啟BackPack");
+            autoRestartBackPackBtn.setBackground(new Color(133, 60, 214));
+            if (backPackThreads != null) {
+                for (Thread t : backPackThreads)
+                    t.interrupt();
+                backPackThreads.clear();
+            }
+        }
+    }
+
+    private void startAutoRestartBackPackLoop() {
+        new Thread(() -> {
+            List<String> devices = getAdbDevices();
+            if (devices.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    statusLabel.setText("● 錯誤：未偵測到裝置");
+                    toggleAutoRestartBackPack();
+                });
+                return;
+            }
+
+            backPackThreads.clear();
+            for (String deviceId : devices) {
+                Thread t = new Thread(() -> {
+                    try {
+                        System.out.println("Started BackPack loop for: " + deviceId);
+                        while (isBackPackLooping) {
+                            runAdb(deviceId,
+                                    "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
+                            Thread.sleep(5000);
+                            if (!isBackPackLooping)
+                                break;
+
+                            int iterations = 5 + random.nextInt(11); // 隨機 5 到 15 次
+                            for (int i = 0; i < iterations; i++) {
+                                if (!isBackPackLooping)
+                                    break;
+
+                                int type = random.nextInt(3); // 隨機選擇三種滑動方式之一
+                                int rx1, ry1, rx2, ry2;
+
+                                if (type == 0) {
+                                    // 原有的垂直滑動 (瀏覽)
+                                    rx1 = 600 + random.nextInt(11) - 5;
+                                    ry1 = 1550 + random.nextInt(11) - 5;
+                                    rx2 = 600 + random.nextInt(11) - 5;
+                                    ry2 = 2350 + random.nextInt(11) - 5;
+                                } else if (type == 1) {
+                                    // 新增橫向滑動 1: 200,600 -> 1000,600
+                                    rx1 = 200 + random.nextInt(11) - 5;
+                                    ry1 = 600 + random.nextInt(11) - 5;
+                                    rx2 = 1000 + random.nextInt(11) - 5;
+                                    ry2 = 600 + random.nextInt(11) - 5;
+                                } else {
+                                    // 新增橫向滑動 2: 1000,600 -> 200,600
+                                    rx1 = 1000 + random.nextInt(11) - 5;
+                                    ry1 = 600 + random.nextInt(11) - 5;
+                                    rx2 = 200 + random.nextInt(11) - 5;
+                                    ry2 = 600 + random.nextInt(11) - 5;
+                                }
+
+                                runAdb(deviceId,
+                                        String.format("shell input swipe %d %d %d %d 500", rx1, ry1, rx2, ry2));
+                                Thread.sleep(3000);
+                            }
+                            if (!isBackPackLooping)
+                                break;
+
+                            runAdb(deviceId, "shell am force-stop app.backpack.mobile.standalone");
+                            // 等待一段時間再重新開啟
+                            Thread.sleep(2000);
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("BackPack thread interrupted for: " + deviceId);
+                    }
+                }, "BackPack-" + deviceId);
+                backPackThreads.add(t);
+                t.start();
+            }
+            SwingUtilities.invokeLater(() -> statusLabel.setText("● BackPack 重啟迴圈運行中 (" + devices.size() + "台)"));
+        }).start();
+    }
+
+    private void resetBackPackAllDevices() {
+        new Thread(() -> {
+            List<String> devices = getAdbDevices();
+            for (String deviceId : devices) {
+                runAdb(deviceId, "shell pm clear app.backpack.mobile.standalone");
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                runAdb(deviceId,
+                        "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
+            }
+        }).start();
     }
 
     private void setAllDevicesBrightness(int mode, int value) {
@@ -359,8 +501,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             List<String> devices = getAdbDevices();
             SwingUtilities.invokeLater(() -> {
                 deviceListModel.clear();
-                for (String d : devices) deviceListModel.addElement(d);
-                if (devices.isEmpty()) deviceListModel.addElement(" [ 未偵測到裝置 ] ");
+                for (String d : devices)
+                    deviceListModel.addElement(d);
+                if (devices.isEmpty())
+                    deviceListModel.addElement(" [ 未偵測到裝置 ] ");
             });
         }).start();
     }
