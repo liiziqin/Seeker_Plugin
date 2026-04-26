@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Date;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,6 +35,9 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JButton refreshButton;
     private JButton automationButton;
     private JButton autoRestartBackPackBtn;
+    private JSpinner timeSpinner;
+    private JToggleButton autoSwitchBtn;
+    private Timer schedulerTimer;
 
     /**
      * Windows 原生 API 介面定義
@@ -139,7 +143,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         deviceList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
-                    boolean cellHasFocus) {
+                                                          boolean cellHasFocus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,
                         cellHasFocus);
                 label.setBorder(new EmptyBorder(0, 10, 0, 10));
@@ -152,7 +156,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
         // 底部控制
-        JPanel footerPanel = new JPanel(new GridLayout(4, 1, 10, 10));
+        JPanel footerPanel = new JPanel(new GridLayout(5, 1, 10, 10));
         footerPanel.setOpaque(false);
 
         // 狀態與刷新
@@ -218,9 +222,30 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         automationButton.setFocusable(false);
         automationButton.addActionListener(e -> toggleAutomation());
 
+        // 排程控制
+        JPanel schedulerPanel = new JPanel(new BorderLayout(10, 0));
+        schedulerPanel.setOpaque(false);
+
+        SpinnerDateModel dateModel = new SpinnerDateModel();
+        timeSpinner = new JSpinner(dateModel);
+        JSpinner.DateEditor timeEditor = new JSpinner.DateEditor(timeSpinner, "yyyy-MM-dd HH:mm:ss");
+        timeSpinner.setEditor(timeEditor);
+        timeSpinner.setFont(new Font("Consolas", Font.PLAIN, 14));
+        timeSpinner.setFocusable(false);
+
+        autoSwitchBtn = new JToggleButton("時間到自動切換");
+        autoSwitchBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        autoSwitchBtn.setBackground(new Color(60, 63, 65));
+        autoSwitchBtn.setForeground(Color.WHITE);
+        autoSwitchBtn.addActionListener(e -> toggleAutoSwitch());
+
+        schedulerPanel.add(timeSpinner, BorderLayout.CENTER);
+        schedulerPanel.add(autoSwitchBtn, BorderLayout.EAST);
+
         footerPanel.add(statusRow);
         footerPanel.add(brightnessPanel);
         footerPanel.add(backpackPanel);
+        footerPanel.add(schedulerPanel);
         footerPanel.add(automationButton);
 
         mainPanel.add(footerPanel, BorderLayout.SOUTH);
@@ -261,6 +286,43 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             // 恢復系統正常電源設定
             Kernel32.INSTANCE.SetThreadExecutionState(Kernel32.ES_CONTINUOUS);
             System.out.println("Windows API: 已恢復正常電源設定");
+        }
+    }
+
+    private void toggleAutoSwitch() {
+        if (autoSwitchBtn.isSelected()) {
+            try {
+                // 強制提交編輯，確保 Model 獲取到最新輸入的文字
+                timeSpinner.commitEdit();
+            } catch (Exception e) {
+                // 如果格式錯誤，可維持舊值或報錯
+            }
+            autoSwitchBtn.setBackground(new Color(214, 150, 33));
+            if (schedulerTimer == null) {
+                schedulerTimer = new Timer(1000, e -> checkSchedule());
+            }
+            schedulerTimer.start();
+        } else {
+            autoSwitchBtn.setBackground(new Color(60, 63, 65));
+            if (schedulerTimer != null) {
+                schedulerTimer.stop();
+            }
+        }
+    }
+
+    private void checkSchedule() {
+        Date selectedDate = (Date) timeSpinner.getValue();
+        if (new Date().after(selectedDate)) {
+            autoSwitchBtn.setSelected(false);
+            toggleAutoSwitch(); // 停止計時器並重置樣式
+
+            // 當目前日期時間超過選擇的日期時間，停止`自動化迴圈`、開啟`自動重啟BackPack`
+            if (isLooping) {
+                toggleAutomation();
+            }
+            if (!isBackPackLooping) {
+                toggleAutoRestartBackPack();
+            }
         }
     }
 
@@ -321,8 +383,15 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     }
 
     private void runDeviceSequence(String deviceId) throws InterruptedException {
-        // 0. 關閉或刷新(1113, 606)
-        tap(deviceId, 1113, 606);
+        // 關閉交易成功視窗
+        for (int i = 0; i < 3; ++i) {
+            tap(deviceId, 1115, 570);
+            Thread.sleep(300);
+        }
+
+        // 0. 刷新(1113, 606)
+        tap(deviceId, 1115, 600);
+        Thread.sleep(1000);
 
         // 1. 隨機幣種 (600, 1160)
         if (random.nextInt(100) < 50) { // 50% 機率
