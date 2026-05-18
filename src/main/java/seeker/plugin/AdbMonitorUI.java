@@ -35,6 +35,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JButton refreshButton;
     private JButton automationButton;
     private JButton autoRestartBackPackBtn;
+    private JButton randomSwipeBtn;
     private JSpinner timeSpinner;
     private JToggleButton autoSwitchBtn;
     private Timer schedulerTimer;
@@ -59,6 +60,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private List<Thread> deviceThreads = new ArrayList<>();
     private volatile boolean isBackPackLooping = false;
     private List<Thread> backPackThreads = new ArrayList<>();
+    private volatile boolean isRandomSwipeLooping = false;
+    private List<Thread> randomSwipeThreads = new ArrayList<>();
     private final Random random = new Random();
     private String adbPath = "adb";
 
@@ -79,7 +82,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
     private void initUI() {
         setTitle("Seeker - ADB 自動化監控工具");
-        setSize(450, 650);
+        setSize(450, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setAlwaysOnTop(true);
@@ -156,7 +159,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
         // 底部控制
-        JPanel footerPanel = new JPanel(new GridLayout(5, 1, 10, 10));
+        JPanel footerPanel = new JPanel(new GridLayout(6, 1, 10, 10));
         footerPanel.setOpaque(false);
 
         // 狀態與刷新
@@ -214,6 +217,19 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         backpackPanel.add(autoRestartBackPackBtn);
         backpackPanel.add(resetBackPackBtn);
 
+        // 其他控制
+        JPanel miscPanel = new JPanel(new GridLayout(1, 1, 10, 10));
+        miscPanel.setOpaque(false);
+
+        randomSwipeBtn = new JButton("隨機範圍滑動迴圈");
+        randomSwipeBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        randomSwipeBtn.setFocusable(false);
+        randomSwipeBtn.setBackground(new Color(33, 150, 243));
+        randomSwipeBtn.setForeground(Color.WHITE);
+        randomSwipeBtn.addActionListener(e -> toggleRandomSwipeLoop());
+
+        miscPanel.add(randomSwipeBtn);
+
         // 自動化大按鈕
         automationButton = new JButton("開始自動化迴圈 (F1)");
         automationButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
@@ -245,6 +261,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         footerPanel.add(statusRow);
         footerPanel.add(brightnessPanel);
         footerPanel.add(backpackPanel);
+        footerPanel.add(miscPanel);
         footerPanel.add(schedulerPanel);
         footerPanel.add(automationButton);
 
@@ -542,6 +559,64 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                 runAdb(deviceId,
                         "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
             }
+        }).start();
+    }
+
+    private void toggleRandomSwipeLoop() {
+        isRandomSwipeLooping = !isRandomSwipeLooping;
+        if (isRandomSwipeLooping) {
+            setAllDevicesBrightness(0, 1);
+            randomSwipeBtn.setText("停止隨機滑動");
+            randomSwipeBtn.setBackground(new Color(207, 34, 46));
+            startRandomSwipeLoop();
+        } else {
+            setAllDevicesBrightness(1, 20);
+            randomSwipeBtn.setText("隨機範圍滑動迴圈");
+            randomSwipeBtn.setBackground(new Color(33, 150, 243));
+            if (randomSwipeThreads != null) {
+                for (Thread t : randomSwipeThreads)
+                    t.interrupt();
+                randomSwipeThreads.clear();
+            }
+        }
+    }
+
+    private void startRandomSwipeLoop() {
+        new Thread(() -> {
+            List<String> devices = getAdbDevices();
+            if (devices.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    statusLabel.setText("● 錯誤：未偵測到裝置");
+                    toggleRandomSwipeLoop();
+                });
+                return;
+            }
+
+            randomSwipeThreads.clear();
+            for (String deviceId : devices) {
+                Thread t = new Thread(() -> {
+                    try {
+                        System.out.println("Started Random Swipe loop for: " + deviceId);
+                        while (isRandomSwipeLooping) {
+                            // 在 x:100~1100, y:300~2300 範圍內隨機取得兩點
+                            int rx1 = 100 + random.nextInt(1001);
+                            int ry1 = 300 + random.nextInt(2001);
+                            int rx2 = 100 + random.nextInt(1001);
+                            int ry2 = 300 + random.nextInt(2001);
+
+                            runAdb(deviceId, String.format("shell input swipe %d %d %d %d 500", rx1, ry1, rx2, ry2));
+                            
+                            // 延遲一段時間再滑動，例如 2 到 4 秒
+                            Thread.sleep(2000 + random.nextInt(2000));
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("Random Swipe thread interrupted for: " + deviceId);
+                    }
+                }, "RandomSwipe-" + deviceId);
+                randomSwipeThreads.add(t);
+                t.start();
+            }
+            SwingUtilities.invokeLater(() -> statusLabel.setText("● 隨機滑動迴圈運行中 (" + devices.size() + "台)"));
         }).start();
     }
 
