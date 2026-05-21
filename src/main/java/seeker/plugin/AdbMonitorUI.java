@@ -270,11 +270,11 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         timeSpinner.setFont(new Font("Consolas", Font.PLAIN, 14));
         timeSpinner.setFocusable(false);
 
-        autoSwitchBtn = new JToggleButton("時間到自動切換");
+        autoSwitchBtn = new JToggleButton("時間到切換BackPack自動重啟");
         autoSwitchBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         autoSwitchBtn.setBackground(new Color(60, 63, 65));
         autoSwitchBtn.setForeground(Color.WHITE);
-        autoSwitchBtn.setPreferredSize(new Dimension(130, 35));
+        autoSwitchBtn.setPreferredSize(new Dimension(200, 35));
         autoSwitchBtn.addActionListener(e -> toggleAutoSwitch());
 
         schedulerPanel.add(timeSpinner, BorderLayout.CENTER);
