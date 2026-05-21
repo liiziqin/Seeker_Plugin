@@ -148,7 +148,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         deviceList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
-                                                          boolean cellHasFocus) {
+                    boolean cellHasFocus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,
                         cellHasFocus);
                 label.setBorder(new EmptyBorder(0, 10, 0, 10));
@@ -216,10 +216,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                         TitledBorder.LEFT,
                         TitledBorder.TOP,
                         new Font("Microsoft JhengHei", Font.BOLD, 12),
-                        new Color(180, 120, 240)
-                ),
-                BorderFactory.createEmptyBorder(2, 8, 8, 8)
-        ));
+                        new Color(180, 120, 240)),
+                BorderFactory.createEmptyBorder(2, 8, 8, 8)));
 
         autoRestartBackPackBtn = new JButton("自動重啟");
         autoRestartBackPackBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
@@ -627,8 +625,16 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             for (String deviceId : devices) {
                 Thread t = new Thread(() -> {
                     try {
+                        // 0. adb指令關閉backpack
+                        runAdb(deviceId, "shell am force-stop app.backpack.mobile.standalone");
+                        runAdb(deviceId, "shell am force-stop com.android.settings");
+
+                        // 額外等待0.1秒確保操作完成
+                        Thread.sleep(100);
+
                         // 1. adb指令開啟應用程式詳情設定
-                        runAdb(deviceId, "shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:app.backpack.mobile.standalone");
+                        runAdb(deviceId,
+                                "shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:app.backpack.mobile.standalone");
 
                         // 2. 等待0.6秒
                         Thread.sleep(600);
@@ -648,7 +654,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                         Thread.sleep(100);
 
                         // 6. 使用adb指令開啟backpack
-                        runAdb(deviceId, "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
+                        runAdb(deviceId,
+                                "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
 
                         // 額外等待3秒確保操作完成
                         Thread.sleep(3000);
@@ -719,7 +726,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                             int ry2 = 300 + random.nextInt(2001);
 
                             runAdb(deviceId, String.format("shell input swipe %d %d %d %d 500", rx1, ry1, rx2, ry2));
-                            
+
                             // 延遲一段時間再滑動，例如 2 到 4 秒
                             Thread.sleep(2000 + random.nextInt(2000));
                         }
