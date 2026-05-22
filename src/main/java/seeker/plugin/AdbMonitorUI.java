@@ -839,8 +839,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             // 7. 點擊x:1000,y:2500
             runAdb(deviceId, "shell input tap 1000 2500");
 
-            // 額外等待8秒確保操作完成
-            Thread.sleep(8000 + random.nextInt(2001));
+            // 額外等待10秒確保操作完成
+            Thread.sleep(10000 + random.nextInt(2001));
 
             // 隨機交換幣種 (600, 1160)
             if (random.nextBoolean()) {
