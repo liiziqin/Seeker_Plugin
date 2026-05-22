@@ -41,6 +41,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JSpinner timeSpinner;
     private JToggleButton autoSwitchBtn;
     private Timer schedulerTimer;
+    private JSpinner autoClearSecondsSpinner;
+    private JToggleButton autoClearCacheBtn;
+    private Timer autoClearCacheTimer;
+    private int autoClearRemainingSeconds = 0;
 
     /**
      * Windows 原生 API 介面定義
@@ -64,6 +68,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private List<Thread> backPackThreads = new ArrayList<>();
     private volatile boolean isRandomSwipeLooping = false;
     private List<Thread> randomSwipeThreads = new ArrayList<>();
+    private volatile boolean isAutoClearCacheRunning = false;
+    private volatile boolean resumeAutomationAfterClear = false;
     private final Random random = new Random();
     private String adbPath = "adb";
 
@@ -280,6 +286,35 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         schedulerPanel.add(timeSpinner, BorderLayout.CENTER);
         schedulerPanel.add(autoSwitchBtn, BorderLayout.EAST);
 
+        // 自動清除快取控制
+        JPanel autoClearPanel = new JPanel(new BorderLayout(10, 0));
+        autoClearPanel.setOpaque(false);
+        autoClearPanel.setPreferredSize(new Dimension(0, 35));
+
+        JPanel autoClearInputPanel = new JPanel(new BorderLayout(6, 0));
+        autoClearInputPanel.setOpaque(false);
+
+        JLabel autoClearLabel = new JLabel("每隔(秒)");
+        autoClearLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        autoClearLabel.setForeground(new Color(201, 209, 217));
+
+        autoClearSecondsSpinner = new JSpinner(new SpinnerNumberModel(120, 1, 86400, 1));
+        autoClearSecondsSpinner.setFont(new Font("Consolas", Font.PLAIN, 14));
+        autoClearSecondsSpinner.setFocusable(false);
+
+        autoClearInputPanel.add(autoClearLabel, BorderLayout.WEST);
+        autoClearInputPanel.add(autoClearSecondsSpinner, BorderLayout.CENTER);
+
+        autoClearCacheBtn = new JToggleButton("自動清除快取");
+        autoClearCacheBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        autoClearCacheBtn.setBackground(new Color(60, 63, 65));
+        autoClearCacheBtn.setForeground(Color.WHITE);
+        autoClearCacheBtn.setPreferredSize(new Dimension(160, 35));
+        autoClearCacheBtn.addActionListener(e -> toggleAutoClearCache());
+
+        autoClearPanel.add(autoClearInputPanel, BorderLayout.CENTER);
+        autoClearPanel.add(autoClearCacheBtn, BorderLayout.EAST);
+
         // 自動化大按鈕
         automationButton = new JButton("開始自動化迴圈 (F1)");
         automationButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
@@ -311,6 +346,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         footerPanel.add(schedulerPanel, gbc);
 
         gbc.gridy = 5;
+        gbc.insets = new Insets(0, 0, 10, 0);
+        footerPanel.add(autoClearPanel, gbc);
+
+        gbc.gridy = 6;
         gbc.insets = new Insets(0, 0, 0, 0);
         footerPanel.add(automationButton, gbc);
 
@@ -392,26 +431,141 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         }
     }
 
-    private void toggleAutomation() {
-        isLooping = !isLooping;
-        if (isLooping) {
-            setAllDevicesBrightness(0, 1);
-            automationButton.setText("停止自動化迴圈 (F1)");
-            automationButton.setBackground(new Color(207, 34, 46));
-            statusLabel.setText("● 運作中...");
-            statusLabel.setForeground(new Color(46, 160, 67));
-            startAutomationLoop();
+    private void toggleAutoClearCache() {
+        if (autoClearCacheBtn.isSelected()) {
+            try {
+                autoClearSecondsSpinner.commitEdit();
+            } catch (Exception e) {
+                autoClearSecondsSpinner.setValue(300);
+            }
+            autoClearCacheBtn.setBackground(new Color(0, 150, 136));
+            if (isLooping) {
+                restartAutoClearCacheTimer();
+            } else {
+                autoClearCacheBtn.setText("自動清除快取：已啟用");
+            }
         } else {
+            autoClearCacheBtn.setBackground(new Color(60, 63, 65));
+            autoClearCacheBtn.setText("自動清除快取");
+            stopAutoClearCacheTimer();
+        }
+    }
+
+    private void restartAutoClearCacheTimer() {
+        stopAutoClearCacheTimer();
+
+        try {
+            autoClearSecondsSpinner.commitEdit();
+        } catch (Exception e) {
+            autoClearSecondsSpinner.setValue(300);
+        }
+        autoClearRemainingSeconds = (Integer) autoClearSecondsSpinner.getValue();
+        updateAutoClearCacheCountdownText();
+        autoClearCacheTimer = new Timer(1000, e -> checkAutoClearCacheCountdown());
+        autoClearCacheTimer.setRepeats(true);
+        autoClearCacheTimer.start();
+    }
+
+    private void checkAutoClearCacheCountdown() {
+        if (!isLooping || isAutoClearCacheRunning) {
+            return;
+        }
+
+        autoClearRemainingSeconds--;
+        if (autoClearRemainingSeconds <= 0) {
+            autoClearCacheBtn.setText("清除快取中...");
+            runAutoClearCacheCycle();
+        } else {
+            updateAutoClearCacheCountdownText();
+        }
+    }
+
+    private void updateAutoClearCacheCountdownText() {
+        autoClearCacheBtn.setText("自動清除快取 (" + autoClearRemainingSeconds + "秒)");
+    }
+
+    private void stopAutoClearCacheTimer() {
+        if (autoClearCacheTimer != null) {
+            autoClearCacheTimer.stop();
+            autoClearCacheTimer = null;
+        }
+        autoClearRemainingSeconds = 0;
+    }
+
+    private void runAutoClearCacheCycle() {
+        if (isAutoClearCacheRunning || !isLooping) {
+            return;
+        }
+
+        isAutoClearCacheRunning = true;
+        resumeAutomationAfterClear = true;
+        stopAutomationLoop(false);
+        stopAutoClearCacheTimer();
+
+        new Thread(() -> {
+            try {
+                clearBackPackCacheAndOpenSync();
+                if (resumeAutomationAfterClear) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (!isLooping) {
+                            startAutomationState();
+                        }
+                    });
+                }
+            } finally {
+                isAutoClearCacheRunning = false;
+            }
+        }, "AutoClearCacheCycle").start();
+    }
+
+    private void toggleAutomation() {
+        if (isAutoClearCacheRunning) {
+            stopAutomationState();
+            return;
+        }
+
+        if (!isLooping) {
+            startAutomationState();
+        } else {
+            stopAutomationState();
+        }
+    }
+
+    private void startAutomationState() {
+        isLooping = true;
+        resumeAutomationAfterClear = false;
+        setAllDevicesBrightness(0, 1);
+        automationButton.setText("停止自動化迴圈 (F1)");
+        automationButton.setBackground(new Color(207, 34, 46));
+        statusLabel.setText("● 運作中...");
+        statusLabel.setForeground(new Color(46, 160, 67));
+        startAutomationLoop();
+        if (autoClearCacheBtn.isSelected()) {
+            restartAutoClearCacheTimer();
+        }
+    }
+
+    private void stopAutomationState() {
+        resumeAutomationAfterClear = false;
+        stopAutoClearCacheTimer();
+        stopAutomationLoop(true);
+    }
+
+    private void stopAutomationLoop(boolean updateUi) {
+        isLooping = false;
+        if (updateUi) {
             setAllDevicesBrightness(1, 20);
             automationButton.setText("開始自動化迴圈 (F1)");
             automationButton.setBackground(new Color(46, 160, 67));
             statusLabel.setText("● 已停止");
             statusLabel.setForeground(new Color(207, 34, 46));
-            if (deviceThreads != null) {
-                for (Thread t : deviceThreads)
-                    t.interrupt();
-                deviceThreads.clear();
-            }
+        } else {
+            statusLabel.setText("● 自動清除快取：停止迴圈中...");
+        }
+        if (deviceThreads != null) {
+            for (Thread t : deviceThreads)
+                t.interrupt();
+            deviceThreads.clear();
         }
     }
 
@@ -612,75 +766,89 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     }
 
     private void clearBackPackCacheAndOpen() {
-        new Thread(() -> {
-            List<String> devices = getAdbDevices();
-            if (devices.isEmpty()) {
-                SwingUtilities.invokeLater(() -> statusLabel.setText("● 錯誤：未偵測到裝置"));
-                return;
+        new Thread(this::clearBackPackCacheAndOpenSync).start();
+    }
+
+    private void clearBackPackCacheAndOpenSync() {
+        List<String> devices = getAdbDevices();
+        if (devices.isEmpty()) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("● 錯誤：未偵測到裝置"));
+            return;
+        }
+
+        SwingUtilities.invokeLater(() -> statusLabel.setText("● 執行中：清除快取並開啟..."));
+
+        List<Thread> threads = new ArrayList<>();
+        for (String deviceId : devices) {
+            Thread t = new Thread(() -> clearBackPackCacheAndOpenDevice(deviceId));
+            threads.add(t);
+            t.start();
+        }
+
+        // 等待所有執行緒結束
+        for (Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
+        }
 
-            SwingUtilities.invokeLater(() -> statusLabel.setText("● 執行中：清除快取並開啟..."));
+        SwingUtilities.invokeLater(() -> statusLabel.setText("● 清除快取完成且已開啟"));
+    }
 
-            List<Thread> threads = new ArrayList<>();
-            for (String deviceId : devices) {
-                Thread t = new Thread(() -> {
-                    try {
-                        // 0. adb指令關閉backpack
-                        runAdb(deviceId, "shell am force-stop app.backpack.mobile.standalone");
-                        runAdb(deviceId, "shell am force-stop com.android.settings");
+    private void clearBackPackCacheAndOpenDevice(String deviceId) {
+        try {
+            // 0. adb指令關閉backpack
+            runAdb(deviceId, "shell am force-stop app.backpack.mobile.standalone");
+            runAdb(deviceId, "shell am force-stop com.android.settings");
 
-                        // 額外等待0.1秒確保操作完成
-                        Thread.sleep(100);
+            // 額外等待0.1秒確保操作完成
+            Thread.sleep(100);
 
-                        // 1. adb指令開啟應用程式詳情設定
-                        runAdb(deviceId,
-                                "shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:app.backpack.mobile.standalone");
+            // 1. adb指令開啟應用程式詳情設定
+            runAdb(deviceId,
+                    "shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:app.backpack.mobile.standalone");
 
-                        // 2. 等待0.6秒
-                        Thread.sleep(600);
+            // 2. 等待0.6秒
+            Thread.sleep(600);
 
-                        // 3. 點擊x:600,y:2000，共2次
-                        runAdb(deviceId, "shell input tap 600 2000");
-                        runAdb(deviceId, "shell input tap 600 2000");
+            // 3. 點擊x:600,y:2000，共2次
+            runAdb(deviceId, "shell input tap 600 2000");
+            runAdb(deviceId, "shell input tap 600 2000");
 
-                        // 4. 等待0.3秒
-                        Thread.sleep(300);
+            // 4. 等待0.3秒
+            Thread.sleep(300);
 
-                        // 5. 點擊x:850,y:1200，共2次
-                        runAdb(deviceId, "shell input tap 850 1200");
-                        runAdb(deviceId, "shell input tap 850 1200");
+            // 5. 點擊x:850,y:1200，共2次
+            runAdb(deviceId, "shell input tap 850 1200");
+            runAdb(deviceId, "shell input tap 850 1200");
 
-                        // 額外等待0.1秒確保操作完成
-                        Thread.sleep(100);
+            // 額外等待0.1秒確保操作完成
+            Thread.sleep(100);
 
-                        // 6. 使用adb指令開啟backpack
-                        runAdb(deviceId,
-                                "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
+            // 6. 使用adb指令開啟backpack
+            runAdb(deviceId,
+                    "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
 
-                        // 額外等待3秒確保操作完成
-                        Thread.sleep(3000);
+            // 額外等待6秒確保操作完成
+            Thread.sleep(6000);
 
-                        // 7. 點擊x:1000,y:2500
-                        runAdb(deviceId, "shell input tap 1000 2500");
-                    } catch (InterruptedException e) {
-                        System.out.println("Clear cache thread interrupted for: " + deviceId);
-                    }
-                });
-                threads.add(t);
-                t.start();
-            }
+            // 7. 點擊x:1000,y:2500
+            runAdb(deviceId, "shell input tap 1000 2500");
 
-            // 等待所有執行緒結束
-            for (Thread t : threads) {
-                try {
-                    t.join();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            // 額外等待10秒確保操作完成
+            Thread.sleep(10000);
 
-            SwingUtilities.invokeLater(() -> statusLabel.setText("● 清除快取完成且已開啟"));
-        }).start();
+            // 8. 點擊x:1070,y:1060
+            runAdb(deviceId, "shell input tap 1070 1060");
+
+            // 額外等待1秒確保操作完成
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            System.out.println("Clear cache thread interrupted for: " + deviceId);
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void toggleRandomSwipeLoop() {
