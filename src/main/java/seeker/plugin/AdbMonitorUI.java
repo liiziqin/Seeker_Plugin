@@ -154,7 +154,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         deviceList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected,
-                    boolean cellHasFocus) {
+                                                          boolean cellHasFocus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected,
                         cellHasFocus);
                 label.setBorder(new EmptyBorder(0, 10, 0, 10));
@@ -613,8 +613,10 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         tap(deviceId, 1115, 600);
         Thread.sleep(1000);
 
-        // 1. 隨機幣種 (600, 1160)
-        if (random.nextInt(100) < 50) { // 50% 機率
+        // 1. 隨機交換幣種 (600, 1160)
+        if (random.nextBoolean()) {
+            tap(deviceId, 600, 1160);
+            Thread.sleep(100);
             tap(deviceId, 600, 1160);
         }
         Thread.sleep(1000);
@@ -803,22 +805,22 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             runAdb(deviceId, "shell am force-stop app.backpack.mobile.standalone");
             runAdb(deviceId, "shell am force-stop com.android.settings");
 
-            // 額外等待0.1秒確保操作完成
-            Thread.sleep(100);
+            // 額外等待0.3秒確保操作完成
+            Thread.sleep(300);
 
             // 1. adb指令開啟應用程式詳情設定
             runAdb(deviceId,
                     "shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:app.backpack.mobile.standalone");
 
-            // 2. 等待0.6秒
-            Thread.sleep(600);
+            // 2. 等待1秒
+            Thread.sleep(1000);
 
             // 3. 點擊x:600,y:2000，共2次
             runAdb(deviceId, "shell input tap 600 2000");
             runAdb(deviceId, "shell input tap 600 2000");
 
-            // 4. 等待0.3秒
-            Thread.sleep(300);
+            // 4. 等待0.5秒
+            Thread.sleep(500);
 
             // 5. 點擊x:850,y:1200，共2次
             runAdb(deviceId, "shell input tap 850 1200");
@@ -832,13 +834,23 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                     "shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity");
 
             // 額外等待6秒確保操作完成
-            Thread.sleep(6000);
+            Thread.sleep(6000 + random.nextInt(2001));
 
             // 7. 點擊x:1000,y:2500
             runAdb(deviceId, "shell input tap 1000 2500");
 
-            // 額外等待10秒確保操作完成
-            Thread.sleep(10000);
+            // 額外等待8秒確保操作完成
+            Thread.sleep(8000 + random.nextInt(2001));
+
+            // 隨機交換幣種 (600, 1160)
+            if (random.nextBoolean()) {
+                tap(deviceId, 600, 1160);
+                Thread.sleep(100);
+                tap(deviceId, 600, 1160);
+            }
+
+            // 額外等待2秒確保操作完成
+            Thread.sleep(1000);
 
             // 8. 點擊x:1070,y:1060
             runAdb(deviceId, "shell input tap 1070 1060");
