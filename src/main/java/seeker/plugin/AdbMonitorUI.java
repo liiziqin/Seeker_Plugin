@@ -70,6 +70,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private List<Thread> randomSwipeThreads = new ArrayList<>();
     private volatile boolean isAutoClearCacheRunning = false;
     private volatile boolean resumeAutomationAfterClear = false;
+    private static final long AUTOMATION_DEVICE_START_DELAY_MS = 100L;
+    private static final long CLEAR_CACHE_DEVICE_START_DELAY_MS = 5000L;
     private final Random random = new Random();
     private String adbPath = "adb";
 
@@ -581,7 +583,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             }
 
             deviceThreads.clear();
-            for (String deviceId : devices) {
+            for (int i = 0; i < devices.size() && isLooping; i++) {
+                String deviceId = devices.get(i);
                 Thread t = new Thread(() -> {
                     try {
                         System.out.println("Started thread for device: " + deviceId);
@@ -596,9 +599,20 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
                 }, "Thread-" + deviceId);
                 deviceThreads.add(t);
                 t.start();
+
+                if (i < devices.size() - 1 && isLooping) {
+                    try {
+                        Thread.sleep(AUTOMATION_DEVICE_START_DELAY_MS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             }
 
-            SwingUtilities.invokeLater(() -> statusLabel.setText("● " + devices.size() + " 台裝置運行中..."));
+            if (isLooping) {
+                SwingUtilities.invokeLater(() -> statusLabel.setText("● " + deviceThreads.size() + " 台裝置運行中..."));
+            }
         }).start();
     }
 
@@ -781,10 +795,20 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         SwingUtilities.invokeLater(() -> statusLabel.setText("● 執行中：清除快取並開啟..."));
 
         List<Thread> threads = new ArrayList<>();
-        for (String deviceId : devices) {
+        for (int i = 0; i < devices.size(); i++) {
+            String deviceId = devices.get(i);
             Thread t = new Thread(() -> clearBackPackCacheAndOpenDevice(deviceId));
             threads.add(t);
             t.start();
+
+            if (i < devices.size() - 1) {
+                try {
+                    Thread.sleep(CLEAR_CACHE_DEVICE_START_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
         }
 
         // 等待所有執行緒結束
