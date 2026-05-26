@@ -300,7 +300,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         autoClearLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         autoClearLabel.setForeground(new Color(201, 209, 217));
 
-        autoClearSecondsSpinner = new JSpinner(new SpinnerNumberModel(120, 1, 86400, 1));
+        autoClearSecondsSpinner = new JSpinner(new SpinnerNumberModel(180, 1, 86400, 1));
         autoClearSecondsSpinner.setFont(new Font("Consolas", Font.PLAIN, 14));
         autoClearSecondsSpinner.setFocusable(false);
 
