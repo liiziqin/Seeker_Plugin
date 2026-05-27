@@ -121,3 +121,6 @@ adb -s 192.168.0.144:38273 shell am start -n com.degencoinflip.app.twa/com.degen
 adb -s 192.168.0.144:38273 shell am start -n app.backpack.mobile.standalone/app.backpack.mobile.standalone.MainActivity --windowingMode 5
 --「清除資料」並關閉
 adb -s 192.168.0.144:45633 shell pm clear app.backpack.mobile.standalone
+
+--固定Port
+adb -s 192.168.0.113:42021 tcpip 41411

@@ -27,6 +27,16 @@ import java.util.logging.Logger;
  * 支持全域熱鍵 F1 切換對所有裝置的循環點擊操作
  */
 public class AdbMonitorUI extends JFrame implements NativeKeyListener {
+    private static final String DEFAULT_WIRELESS_ADB_PORT = "41411";
+    private static final String DEFAULT_WIRELESS_ADB_IPS = String.join("\n",
+            "192.168.0.100",
+            "192.168.0.248",
+            "192.168.0.113",
+            "192.168.0.198",
+            "192.168.0.144",
+            "192.168.0.213",
+            "192.168.0.206");
+
     private DefaultListModel<String> deviceListModel;
     private JList<String> deviceList;
     private JCheckBox realTimeUpdateCheckBox;
@@ -38,6 +48,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JButton automationButton;
     private JButton autoRestartBackPackBtn;
     private JButton randomSwipeBtn;
+    private JButton wirelessConnectButton;
     private JSpinner timeSpinner;
     private JToggleButton autoSwitchBtn;
     private Timer schedulerTimer;
@@ -45,6 +56,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
     private JToggleButton autoClearCacheBtn;
     private Timer autoClearCacheTimer;
     private int autoClearRemainingSeconds = 0;
+    private JTextArea wirelessIpTextArea;
+    private JTextField wirelessPortField;
 
     /**
      * Windows 原生 API 介面定義
@@ -92,7 +105,7 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
     private void initUI() {
         setTitle("Seeker - ADB 自動化監控工具");
-        setSize(480, 640);
+        setSize(760, 640);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setAlwaysOnTop(true);
@@ -143,8 +156,6 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         configPanel.add(realTimeUpdateCheckBox);
         headerPanel.add(configPanel, BorderLayout.EAST);
 
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
-
         // 中間列表 (JList)
         deviceListModel = new DefaultListModel<>();
         deviceList = new JList<>(deviceListModel);
@@ -166,7 +177,6 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
 
         JScrollPane scrollPane = new JScrollPane(deviceList);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(60, 63, 65)));
-        mainPanel.add(scrollPane, BorderLayout.CENTER);
 
         // 底部控制
         JPanel footerPanel = new JPanel(new GridBagLayout());
@@ -355,10 +365,104 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
         gbc.insets = new Insets(0, 0, 0, 0);
         footerPanel.add(automationButton, gbc);
 
-        mainPanel.add(footerPanel, BorderLayout.SOUTH);
+        JPanel leftPanel = new JPanel(new BorderLayout(15, 15));
+        leftPanel.setOpaque(false);
+        leftPanel.add(headerPanel, BorderLayout.NORTH);
+        leftPanel.add(scrollPane, BorderLayout.CENTER);
+        leftPanel.add(footerPanel, BorderLayout.SOUTH);
+
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setOpaque(false);
+        rightPanel.setPreferredSize(new Dimension(220, 0));
+        rightPanel.add(createWirelessConnectPanel(), BorderLayout.NORTH);
+
+        JPanel contentPanel = new JPanel(new BorderLayout(12, 0));
+        contentPanel.setOpaque(false);
+        contentPanel.add(leftPanel, BorderLayout.CENTER);
+        contentPanel.add(rightPanel, BorderLayout.EAST);
+
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
         add(mainPanel);
 
         updateTimer = new Timer(3000, e -> refreshDeviceList());
+    }
+
+    private JPanel createWirelessConnectPanel() {
+        JPanel wirelessConnectPanel = new JPanel(new BorderLayout(8, 8));
+        wirelessConnectPanel.setOpaque(false);
+        wirelessConnectPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createLineBorder(new Color(80, 80, 80), 1),
+                        " 無線連線 ",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP,
+                        new Font("Microsoft JhengHei", Font.BOLD, 12),
+                        new Color(88, 166, 255)),
+                BorderFactory.createEmptyBorder(6, 8, 8, 8)));
+
+        wirelessIpTextArea = new JTextArea(DEFAULT_WIRELESS_ADB_IPS, 4, 20);
+        wirelessIpTextArea.setFont(new Font("Consolas", Font.PLAIN, 13));
+        wirelessIpTextArea.setLineWrap(false);
+        wirelessIpTextArea.setWrapStyleWord(false);
+        wirelessIpTextArea.setBackground(new Color(22, 23, 26));
+        wirelessIpTextArea.setForeground(new Color(200, 200, 200));
+        wirelessIpTextArea.setCaretColor(Color.WHITE);
+        wirelessIpTextArea.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        JLabel ipLabel = new JLabel("IP 清單");
+        ipLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        ipLabel.setForeground(new Color(201, 209, 217));
+        wirelessConnectPanel.add(ipLabel, BorderLayout.NORTH);
+
+        JScrollPane ipScrollPane = new JScrollPane(wirelessIpTextArea);
+        ipScrollPane.setBorder(BorderFactory.createLineBorder(new Color(60, 63, 65)));
+        ipScrollPane.setPreferredSize(new Dimension(0, 220));
+        wirelessConnectPanel.add(ipScrollPane, BorderLayout.CENTER);
+
+        JPanel actionPanel = new JPanel(new GridBagLayout());
+        actionPanel.setOpaque(false);
+
+        GridBagConstraints actionGbc = new GridBagConstraints();
+        actionGbc.gridx = 0;
+        actionGbc.fill = GridBagConstraints.HORIZONTAL;
+        actionGbc.weightx = 1.0;
+
+        JPanel portPanel = new JPanel(new BorderLayout(6, 0));
+        portPanel.setOpaque(false);
+
+        JLabel portLabel = new JLabel("Port");
+        portLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        portLabel.setForeground(new Color(201, 209, 217));
+
+        wirelessPortField = new JTextField(DEFAULT_WIRELESS_ADB_PORT);
+        wirelessPortField.setFont(new Font("Consolas", Font.PLAIN, 13));
+        wirelessPortField.setBackground(new Color(22, 23, 26));
+        wirelessPortField.setForeground(new Color(200, 200, 200));
+        wirelessPortField.setCaretColor(Color.WHITE);
+        wirelessPortField.setPreferredSize(new Dimension(0, 30));
+
+        portPanel.add(portLabel, BorderLayout.WEST);
+        portPanel.add(wirelessPortField, BorderLayout.CENTER);
+
+        wirelessConnectButton = new JButton("連線");
+        wirelessConnectButton.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        wirelessConnectButton.setFocusable(false);
+        wirelessConnectButton.setBackground(new Color(33, 110, 214));
+        wirelessConnectButton.setForeground(Color.WHITE);
+        wirelessConnectButton.setPreferredSize(new Dimension(0, 32));
+        wirelessConnectButton.addActionListener(e -> connectWirelessDevices());
+
+        actionGbc.gridy = 0;
+        actionGbc.insets = new Insets(0, 0, 8, 0);
+        actionPanel.add(portPanel, actionGbc);
+
+        actionGbc.gridy = 1;
+        actionGbc.insets = new Insets(0, 0, 0, 0);
+        actionPanel.add(wirelessConnectButton, actionGbc);
+
+        wirelessConnectPanel.add(actionPanel, BorderLayout.SOUTH);
+
+        return wirelessConnectPanel;
     }
 
     private void initGlobalHook() {
@@ -378,6 +482,107 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             updateTimer.start();
         else
             updateTimer.stop();
+    }
+
+    private List<String> getWirelessTargetIps() {
+        List<String> ips = new ArrayList<>();
+        for (String line : wirelessIpTextArea.getText().split("\\R")) {
+            String ip = line.trim();
+            if (!ip.isEmpty()) {
+                ips.add(ip);
+            }
+        }
+        return ips;
+    }
+
+    private void connectWirelessDevices() {
+        String port = wirelessPortField.getText().trim();
+        if (port.isEmpty()) {
+            statusLabel.setText("● 請先輸入 Port");
+            statusLabel.setForeground(new Color(207, 34, 46));
+            return;
+        }
+        if (!port.matches("\\d+")) {
+            statusLabel.setText("● Port 格式錯誤，請輸入數字");
+            statusLabel.setForeground(new Color(207, 34, 46));
+            return;
+        }
+
+        List<String> ips = getWirelessTargetIps();
+        if (ips.isEmpty()) {
+            statusLabel.setText("● 請至少輸入一筆 IP");
+            statusLabel.setForeground(new Color(207, 34, 46));
+            return;
+        }
+
+        wirelessConnectButton.setEnabled(false);
+        wirelessConnectButton.setText("連線中...");
+        statusLabel.setText("● 批次連線中...");
+        statusLabel.setForeground(new Color(214, 150, 33));
+
+        new Thread(() -> {
+            int successCount = 0;
+            List<String> failedTargets = new ArrayList<>();
+
+            for (String ip : ips) {
+                String target = ip + ":" + port;
+                try {
+                    String output = runAdbConnect(target);
+                    if (isConnectSuccessful(output)) {
+                        successCount++;
+                    } else {
+                        failedTargets.add(target);
+                    }
+                    System.out.println("ADB connect [" + target + "]: " + output);
+                } catch (Exception e) {
+                    failedTargets.add(target);
+                    System.err.println("ADB connect error [" + target + "]: " + e.getMessage());
+                }
+            }
+
+            int finalSuccessCount = successCount;
+            int failureCount = failedTargets.size();
+            if (!failedTargets.isEmpty()) {
+                System.err.println("ADB connect failed targets: " + String.join(", ", failedTargets));
+            }
+
+            SwingUtilities.invokeLater(() -> {
+                wirelessConnectButton.setEnabled(true);
+        wirelessConnectButton.setText("連線");
+                if (failureCount == 0) {
+                    statusLabel.setText("● 批次連線完成：成功 " + finalSuccessCount + " 台");
+                    statusLabel.setForeground(new Color(46, 160, 67));
+                } else {
+                    statusLabel.setText("● 批次連線完成：成功 " + finalSuccessCount + " 台，失敗 " + failureCount + " 台");
+                    statusLabel.setForeground(new Color(214, 150, 33));
+                }
+                refreshDeviceList();
+            });
+        }, "WirelessAdbConnect").start();
+    }
+
+    private boolean isConnectSuccessful(String output) {
+        String normalizedOutput = output == null ? "" : output.toLowerCase();
+        return normalizedOutput.contains("connected to") || normalizedOutput.contains("already connected to");
+    }
+
+    private String runAdbConnect(String target) throws Exception {
+        ProcessBuilder processBuilder = new ProcessBuilder(adbPath, "connect", target);
+        processBuilder.redirectErrorStream(true);
+
+        Process process = processBuilder.start();
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (output.length() > 0) {
+                    output.append(System.lineSeparator());
+                }
+                output.append(line);
+            }
+        }
+        process.waitFor();
+        return output.toString().trim();
     }
 
     /**
