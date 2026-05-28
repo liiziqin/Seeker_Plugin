@@ -35,7 +35,8 @@ public class AdbMonitorUI extends JFrame implements NativeKeyListener {
             "192.168.0.198",
             "192.168.0.144",
             "192.168.0.213",
-            "192.168.0.206");
+            "192.168.0.206",
+            "192.168.43.187");
 
     private DefaultListModel<String> deviceListModel;
     private JList<String> deviceList;
